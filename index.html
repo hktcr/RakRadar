@@ -63,6 +63,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);-webkit-font
 .info-badge .stat-val.cyan{color:var(--cyan)}
 .info-badge .stat-lbl{font-size:.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em}
 
+/* MOBILE: prevent stats/layer overlap */
+@media(max-width:520px){
+  .info-badge{top:50px;left:auto;right:8px;transform:none;padding:5px 12px;font-size:.66rem}
+  .info-badge .stat-val{font-size:.72rem}
+  .info-badge .stat-lbl{font-size:.54rem}
+}
+
 /* BOTTOM BAR */
 .bottom-bar{display:flex;align-items:center;gap:6px;padding:8px 12px;background:linear-gradient(0deg,var(--surface) 0%,var(--surface2) 100%);border-top:1px solid var(--border);flex-shrink:0;z-index:1000}
 .bb-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:11px 8px;border:1px solid var(--border);border-radius:12px;background:var(--surface2);color:var(--text);font-family:inherit;font-size:.72rem;font-weight:700;cursor:pointer;transition:all .2s}
