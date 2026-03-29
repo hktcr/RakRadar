@@ -31,7 +31,7 @@ body{font-family:var(--sans);background:#000;color:var(--text);-webkit-font-smoo
 
 /* ── LAYERS (top-right, compact) ── */
 .layers{position:absolute;top:10px;right:10px;z-index:1000;display:flex;gap:3px}
-.layer-pill{padding:7px 11px;border:none;border-radius:20px;background:var(--surface);color:var(--text-dim);font-family:var(--sans);font-size:.62rem;font-weight:700;cursor:pointer;transition:all .2s;text-transform:uppercase;letter-spacing:.06em;backdrop-filter:blur(16px);box-shadow:0 2px 12px rgba(0,0,0,.5)}
+.layer-pill{padding:10px 16px;border:none;border-radius:20px;background:var(--surface);color:var(--text-dim);font-family:var(--sans);font-size:.8rem;font-weight:700;cursor:pointer;transition:all .2s;text-transform:uppercase;letter-spacing:.06em;backdrop-filter:blur(16px);box-shadow:0 2px 12px rgba(0,0,0,.5)}
 .layer-pill.active{background:var(--accent);color:#fff;box-shadow:0 2px 16px rgba(139,124,248,.4)}
 
 /* ── CROSSHAIR ── */
@@ -42,12 +42,12 @@ body{font-family:var(--sans);background:#000;color:var(--text);-webkit-font-smoo
 .ch-dot{position:absolute;width:4px;height:4px;border-radius:50%;background:var(--cyan);left:50%;top:50%;transform:translate(-50%,-50%);box-shadow:0 0 6px var(--cyan)}
 
 /* ── GPS BADGE (top-left) ── */
-.gps-badge{position:absolute;top:10px;left:10px;z-index:1000;display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--surface);border-radius:20px;backdrop-filter:blur(16px);box-shadow:0 2px 12px rgba(0,0,0,.5);cursor:pointer;transition:all .2s;border:1px solid transparent}
+.gps-badge{position:absolute;top:10px;left:10px;z-index:1000;display:flex;align-items:center;gap:10px;padding:10px 18px;background:var(--surface);border-radius:24px;backdrop-filter:blur(16px);box-shadow:0 2px 12px rgba(0,0,0,.5);cursor:pointer;transition:all .2s;border:1px solid transparent}
 .gps-badge.tracking{border-color:var(--cyan)}
 .gps-badge .gps-icon{font-size:.85rem}
-.gps-badge .gps-text{font-size:.62rem;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em}
+.gps-badge .gps-text{font-size:.8rem;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em}
 .gps-badge.tracking .gps-text{color:var(--cyan)}
-.gps-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.gps-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .gps-dot.off{background:var(--text-dim)}
 .gps-dot.good{background:var(--green);box-shadow:0 0 6px var(--green)}
 .gps-dot.ok{background:var(--orange);box-shadow:0 0 6px var(--orange)}
@@ -56,29 +56,29 @@ body{font-family:var(--sans);background:#000;color:var(--text);-webkit-font-smoo
 .gps-badge.searching .gps-dot{animation:pulse 1.2s infinite}
 
 /* ── CENTER btn (right edge, mid) ── */
-.center-btn{position:absolute;bottom:50%;right:10px;z-index:1000;width:44px;height:44px;border-radius:50%;background:var(--surface);border:1px solid var(--border);color:var(--text);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1.1rem;backdrop-filter:blur(16px);box-shadow:0 2px 12px rgba(0,0,0,.5);transition:all .2s}
+.center-btn{position:absolute;bottom:50%;right:10px;z-index:1000;width:48px;height:48px;border-radius:50%;background:var(--surface);border:1px solid var(--border);color:var(--text);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1.3rem;backdrop-filter:blur(16px);box-shadow:0 2px 12px rgba(0,0,0,.5);transition:all .2s}
 .center-btn:active{transform:scale(.92);background:var(--accent);color:#fff}
 
 /* ── ZOOM btns ── */
 .zoom-btns{position:absolute;right:10px;z-index:1000;display:flex;flex-direction:column;gap:2px;bottom:calc(50% - 60px)}
-.zoom-btn{width:36px;height:36px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:1.1rem;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(16px);transition:all .15s}
+.zoom-btn{width:44px;height:44px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:1.3rem;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(16px);transition:all .15s}
 .zoom-btn:active{background:var(--surface2);transform:scale(.92)}
 
 /* ── COORDINATE PANEL ── */
 .coord-panel{
   position:absolute;bottom:0;left:0;right:0;z-index:1000;
   background:linear-gradient(0deg,rgba(6,8,14,.98) 60%,rgba(6,8,14,.92));
-  padding:14px 16px max(14px, env(safe-area-inset-bottom));
+  padding:16px 18px max(16px, env(safe-area-inset-bottom));
   backdrop-filter:blur(24px);
   border-top:1px solid rgba(255,255,255,.06);
 }
 
 /* Source row */
 .coord-source{display:flex;align-items:center;gap:6px;margin-bottom:10px}
-.source-pill{padding:5px 10px;border-radius:14px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-family:var(--sans);font-size:.6rem;font-weight:700;cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:.05em}
+.source-pill{padding:8px 14px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-family:var(--sans);font-size:.78rem;font-weight:700;cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:.05em}
 .source-pill.active{background:var(--cyan-glow);color:var(--cyan);border-color:rgba(46,232,200,.25)}
 .source-spacer{flex:1}
-.acc-tag{font-size:.58rem;font-weight:700;color:var(--text-dim);padding:4px 8px;border-radius:10px;background:rgba(255,255,255,.04)}
+.acc-tag{font-size:.72rem;font-weight:700;color:var(--text-dim);padding:6px 10px;border-radius:12px;background:rgba(255,255,255,.04)}
 .acc-tag .val{font-family:var(--mono)}
 .acc-tag.good .val{color:var(--green)}
 .acc-tag.ok .val{color:var(--orange)}
@@ -87,8 +87,8 @@ body{font-family:var(--sans);background:#000;color:var(--text);-webkit-font-smoo
 /* Coordinate rows */
 .coords{display:flex;flex-direction:column;gap:4px}
 .coord-row{display:flex;align-items:center;gap:8px}
-.c-label{font-size:.55rem;font-weight:800;color:var(--text-dim);text-transform:uppercase;letter-spacing:.1em;width:18px;flex-shrink:0}
-.c-digits{font-family:var(--mono);font-size:1.75rem;font-weight:700;color:var(--text-bright);letter-spacing:.04em;flex:1;user-select:all;-webkit-user-select:all;line-height:1.1}
+.c-label{font-size:.75rem;font-weight:800;color:var(--text-dim);text-transform:uppercase;letter-spacing:.1em;width:22px;flex-shrink:0}
+.c-digits{font-family:var(--mono);font-size:2.5rem;font-weight:700;color:var(--text-bright);letter-spacing:.04em;flex:1;user-select:all;-webkit-user-select:all;line-height:1.15}
 .c-digits .int{color:var(--text-bright)}
 .c-digits .dot{color:var(--text-dim);margin:0 1px}
 .c-digits .dec{color:var(--cyan)}
@@ -97,13 +97,13 @@ body{font-family:var(--sans);background:#000;color:var(--text);-webkit-font-smoo
 
 /* Copy button row */
 .copy-row{display:flex;gap:6px;margin-top:10px}
-.copy-btn{flex:1;padding:12px;border-radius:12px;border:none;font-family:var(--sans);font-size:.72rem;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:5px}
+.copy-btn{flex:1;padding:14px;border-radius:14px;border:none;font-family:var(--sans);font-size:.88rem;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px}
 .copy-btn:active{transform:scale(.96)}
 .copy-main{background:var(--accent);color:#fff;box-shadow:0 2px 16px rgba(139,124,248,.3)}
 .copy-sec{background:rgba(255,255,255,.06);color:var(--text);border:1px solid var(--border)}
 
 /* Toast */
-.toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.9);z-index:3000;background:var(--surface);color:var(--text-bright);padding:14px 24px;border-radius:16px;font-family:var(--mono);font-size:1rem;font-weight:700;opacity:0;transition:all .25s;pointer-events:none;box-shadow:0 8px 32px rgba(0,0,0,.6);border:1px solid var(--border);backdrop-filter:blur(24px);letter-spacing:.02em}
+.toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.9);z-index:3000;background:var(--surface);color:var(--text-bright);padding:16px 28px;border-radius:18px;font-family:var(--mono);font-size:1.15rem;font-weight:700;opacity:0;transition:all .25s;pointer-events:none;box-shadow:0 8px 32px rgba(0,0,0,.6);border:1px solid var(--border);backdrop-filter:blur(24px);letter-spacing:.02em}
 .toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
 
 /* Tap marker ring */
