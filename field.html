@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>RåkRadar Fält — Position</title>
+<meta name="description" content="Fältpositionsvisare för råkinventering — Åstorps kommun">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Inter:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#000;--surface:rgba(10,12,18,.96);--surface2:rgba(20,24,36,.95);
+  --border:rgba(255,255,255,.08);--border-light:rgba(255,255,255,.04);
+  --text:#b8bfcc;--text-bright:#f0f2f6;--text-dim:#4a5268;
+  --accent:#8b7cf8;--accent-glow:rgba(139,124,248,.15);
+  --cyan:#2ee8c8;--cyan-glow:rgba(46,232,200,.12);--cyan-dim:rgba(46,232,200,.6);
+  --green:#3ddc84;--orange:#ffb347;--red:#ff6b6b;
+  --mono:'JetBrains Mono',monospace;--sans:'Inter',sans-serif;
+}
+html,body{height:100%;overflow:hidden;touch-action:manipulation}
+body{font-family:var(--sans);background:#000;color:var(--text);-webkit-font-smoothing:antialiased;display:flex;flex-direction:column}
+
+/* ── MAP ── */
+.map-wrap{flex:1;position:relative;min-height:0}
+#map{width:100%;height:100%;z-index:1}
+.leaflet-control-zoom{display:none!important}
+
+/* ── LAYERS (top-right, compact) ── */
+.layers{position:absolute;top:10px;right:10px;z-index:1000;display:flex;gap:3px}
+.layer-pill{padding:7px 11px;border:none;border-radius:20px;background:var(--surface);color:var(--text-dim);font-family:var(--sans);font-size:.62rem;font-weight:700;cursor:pointer;transition:all .2s;text-transform:uppercase;letter-spacing:.06em;backdrop-filter:blur(16px);box-shadow:0 2px 12px rgba(0,0,0,.5)}
+.layer-pill.active{background:var(--accent);color:#fff;box-shadow:0 2px 16px rgba(139,124,248,.4)}
+
+/* ── CROSSHAIR ── */
+.crosshair{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:800;pointer-events:none;width:60px;height:60px}
+.ch-ring{position:absolute;inset:8px;border:1.5px solid rgba(255,255,255,.25);border-radius:50%}
+.ch-v{position:absolute;width:1px;height:100%;left:50%;background:linear-gradient(rgba(255,255,255,0),rgba(255,255,255,.4) 30%,rgba(255,255,255,0) 45%,rgba(255,255,255,0) 55%,rgba(255,255,255,.4) 70%,rgba(255,255,255,0))}
+.ch-h{position:absolute;height:1px;width:100%;top:50%;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.4) 30%,rgba(255,255,255,0) 45%,rgba(255,255,255,0) 55%,rgba(255,255,255,.4) 70%,rgba(255,255,255,0))}
+.ch-dot{position:absolute;width:4px;height:4px;border-radius:50%;background:var(--cyan);left:50%;top:50%;transform:translate(-50%,-50%);box-shadow:0 0 6px var(--cyan)}
+
+/* ── GPS BADGE (top-left) ── */
+.gps-badge{position:absolute;top:10px;left:10px;z-index:1000;display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--surface);border-radius:20px;backdrop-filter:blur(16px);box-shadow:0 2px 12px rgba(0,0,0,.5);cursor:pointer;transition:all .2s;border:1px solid transparent}
+.gps-badge.tracking{border-color:var(--cyan)}
+.gps-badge .gps-icon{font-size:.85rem}
+.gps-badge .gps-text{font-size:.62rem;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em}
+.gps-badge.tracking .gps-text{color:var(--cyan)}
+.gps-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.gps-dot.off{background:var(--text-dim)}
+.gps-dot.good{background:var(--green);box-shadow:0 0 6px var(--green)}
+.gps-dot.ok{background:var(--orange);box-shadow:0 0 6px var(--orange)}
+.gps-dot.poor{background:var(--red);box-shadow:0 0 6px var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.gps-badge.searching .gps-dot{animation:pulse 1.2s infinite}
+
+/* ── CENTER btn (right edge, mid) ── */
+.center-btn{position:absolute;bottom:50%;right:10px;z-index:1000;width:44px;height:44px;border-radius:50%;background:var(--surface);border:1px solid var(--border);color:var(--text);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1.1rem;backdrop-filter:blur(16px);box-shadow:0 2px 12px rgba(0,0,0,.5);transition:all .2s}
+.center-btn:active{transform:scale(.92);background:var(--accent);color:#fff}
+
+/* ── ZOOM btns ── */
+.zoom-btns{position:absolute;right:10px;z-index:1000;display:flex;flex-direction:column;gap:2px;bottom:calc(50% - 60px)}
+.zoom-btn{width:36px;height:36px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:1.1rem;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(16px);transition:all .15s}
+.zoom-btn:active{background:var(--surface2);transform:scale(.92)}
+
+/* ── COORDINATE PANEL ── */
+.coord-panel{
+  position:absolute;bottom:0;left:0;right:0;z-index:1000;
+  background:linear-gradient(0deg,rgba(6,8,14,.98) 60%,rgba(6,8,14,.92));
+  padding:14px 16px max(14px, env(safe-area-inset-bottom));
+  backdrop-filter:blur(24px);
+  border-top:1px solid rgba(255,255,255,.06);
+}
+
+/* Source row */
+.coord-source{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+.source-pill{padding:5px 10px;border-radius:14px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-family:var(--sans);font-size:.6rem;font-weight:700;cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:.05em}
+.source-pill.active{background:var(--cyan-glow);color:var(--cyan);border-color:rgba(46,232,200,.25)}
+.source-spacer{flex:1}
+.acc-tag{font-size:.58rem;font-weight:700;color:var(--text-dim);padding:4px 8px;border-radius:10px;background:rgba(255,255,255,.04)}
+.acc-tag .val{font-family:var(--mono)}
+.acc-tag.good .val{color:var(--green)}
+.acc-tag.ok .val{color:var(--orange)}
+.acc-tag.poor .val{color:var(--red)}
+
+/* Coordinate rows */
+.coords{display:flex;flex-direction:column;gap:4px}
+.coord-row{display:flex;align-items:center;gap:8px}
+.c-label{font-size:.55rem;font-weight:800;color:var(--text-dim);text-transform:uppercase;letter-spacing:.1em;width:18px;flex-shrink:0}
+.c-digits{font-family:var(--mono);font-size:1.75rem;font-weight:700;color:var(--text-bright);letter-spacing:.04em;flex:1;user-select:all;-webkit-user-select:all;line-height:1.1}
+.c-digits .int{color:var(--text-bright)}
+.c-digits .dot{color:var(--text-dim);margin:0 1px}
+.c-digits .dec{color:var(--cyan)}
+.c-digits.warn .dec{color:var(--orange);opacity:.6}
+.c-digits.warn .int{opacity:.7}
+
+/* Copy button row */
+.copy-row{display:flex;gap:6px;margin-top:10px}
+.copy-btn{flex:1;padding:12px;border-radius:12px;border:none;font-family:var(--sans);font-size:.72rem;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:5px}
+.copy-btn:active{transform:scale(.96)}
+.copy-main{background:var(--accent);color:#fff;box-shadow:0 2px 16px rgba(139,124,248,.3)}
+.copy-sec{background:rgba(255,255,255,.06);color:var(--text);border:1px solid var(--border)}
+
+/* Toast */
+.toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.9);z-index:3000;background:var(--surface);color:var(--text-bright);padding:14px 24px;border-radius:16px;font-family:var(--mono);font-size:1rem;font-weight:700;opacity:0;transition:all .25s;pointer-events:none;box-shadow:0 8px 32px rgba(0,0,0,.6);border:1px solid var(--border);backdrop-filter:blur(24px);letter-spacing:.02em}
+.toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+
+/* Tap marker ring */
+@keyframes tapRing{0%{r:0;opacity:.6}100%{r:20;opacity:0}}
+</style>
+</head>
+<body>
+
+<div class="map-wrap">
+  <div id="map"></div>
+
+  <!-- Crosshair -->
+  <div class="crosshair">
+    <div class="ch-ring"></div>
+    <div class="ch-v"></div>
+    <div class="ch-h"></div>
+    <div class="ch-dot"></div>
+  </div>
+
+  <!-- GPS badge -->
+  <div class="gps-badge" id="gpsBadge" onclick="toggleGPS()">
+    <div class="gps-dot off" id="gpsDot"></div>
+    <span class="gps-text" id="gpsText">GPS av</span>
+  </div>
+
+  <!-- Layers -->
+  <div class="layers">
+    <button class="layer-pill active" data-layer="street">Karta</button>
+    <button class="layer-pill" data-layer="terrain">Terr</button>
+    <button class="layer-pill" data-layer="satellite">Sat</button>
+  </div>
+
+  <!-- Center on GPS -->
+  <button class="center-btn" onclick="centerOnGPS()" title="Centrera på GPS">🎯</button>
+
+  <!-- Zoom -->
+  <div class="zoom-btns">
+    <button class="zoom-btn" onclick="map.zoomIn()">+</button>
+    <button class="zoom-btn" onclick="map.zoomOut()">−</button>
+  </div>
+
+  <!-- COORDINATES -->
+  <div class="coord-panel">
+    <div class="coord-source">
+      <button class="source-pill active" data-mode="center" onclick="setSource('center')">⊕ Karta</button>
+      <button class="source-pill" data-mode="gps" onclick="setSource('gps')">📡 GPS</button>
+      <button class="source-pill" data-mode="tap" onclick="setSource('tap')">👆 Tryck</button>
+      <div class="source-spacer"></div>
+      <div class="acc-tag" id="accTag" style="display:none">GPS ±<span class="val" id="accVal">?</span>m</div>
+    </div>
+    <div class="coords">
+      <div class="coord-row">
+        <span class="c-label">N</span>
+        <span class="c-digits" id="latDigits"><span class="int">56</span><span class="dot">.</span><span class="dec">13090</span></span>
+      </div>
+      <div class="coord-row">
+        <span class="c-label">E</span>
+        <span class="c-digits" id="lngDigits"><span class="int">12</span><span class="dot">.</span><span class="dec">99170</span></span>
+      </div>
+    </div>
+    <div class="copy-row">
+      <button class="copy-btn copy-main" onclick="copyPair()">📋 Kopiera position</button>
+      <button class="copy-btn copy-sec" onclick="copyForNotebook()">📓 Anteckningsformat</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════
+const ASTORP = [[56.13336644158679,13.09441598120654],[56.15308134241665,13.075426714220935],[56.17227333280345,13.032405825964709],[56.18736209251589,13.012547832342756],[56.17845145239766,12.962804726179286],[56.14068640518647,12.93141814074781],[56.142083676945624,12.882351723648581],[56.1285446372481,12.83897736487567],[56.10176743719125,12.843392488066545],[56.09420405115015,12.87400081280073],[56.10329578233101,12.90006008332717],[56.11858865850942,12.916726533463356],[56.12198333824545,12.949140310134169],[56.11432198596138,12.968652122032942],[56.11315902004711,13.00448105391143],[56.10291453341187,13.014252594068308],[56.074504983181995,13.070141363477672],[56.08844082018057,13.097852809692492],[56.10370522349981,13.086032150550484],[56.12462157429597,13.105164607118635],[56.13321171954772,13.094642944325177],[56.13336644158679,13.09441598120654]];
+const CENTER = [56.1309, 12.9917];
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+let source = 'center';       // 'center' | 'gps' | 'tap'
+let gpsOn = false;
+let gpsWatchId = null;
+let gpsPos = null;            // [lat, lng]
+let gpsAcc = null;            // meters
+let tapPos = null;            // [lat, lng]
+let gpsMarker = null;
+let gpsCircle = null;
+let tapMarker = null;
+
+// ═══════════════════════════════════════════
+// MAP
+// ═══════════════════════════════════════════
+const map = L.map('map', { zoomControl: false, attributionControl: false }).setView(CENTER, 14);
+
+const tiles = {
+  street: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19 }),
+  terrain: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17 }),
+  satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 })
+};
+tiles.street.addTo(map);
+
+// Layer switching
+document.querySelectorAll('.layer-pill').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.layer-pill').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    Object.values(tiles).forEach(t => map.removeLayer(t));
+    tiles[this.dataset.layer].addTo(map);
+  });
+});
+
+// Boundary
+L.polygon(ASTORP, { color: 'rgba(139,124,248,.5)', weight: 1.5, fillColor: 'rgba(139,124,248,.03)', fillOpacity: 1, dashArray: '6,4' }).addTo(map);
+
+// Scale
+L.control.scale({ position: 'bottomleft', imperial: false, maxWidth: 120 }).addTo(map);
+
+// Adjust scale bar position above coord panel
+document.querySelector('.leaflet-control-scale').style.marginBottom = '170px';
+document.querySelector('.leaflet-control-scale').style.marginLeft = '10px';
+
+// ═══════════════════════════════════════════
+// COORDINATE DISPLAY
+// ═══════════════════════════════════════════
+function fmt(val) {
+  const s = val.toFixed(5);
+  const parts = s.split('.');
+  return { int: parts[0], dec: parts[1] };
+}
+
+function updateDisplay() {
+  let lat, lng, warn = false;
+
+  if (source === 'gps') {
+    if (gpsPos) { lat = gpsPos[0]; lng = gpsPos[1]; warn = gpsAcc > 30; }
+    else { lat = 0; lng = 0; warn = true; }
+  } else if (source === 'tap') {
+    if (tapPos) { lat = tapPos[0]; lng = tapPos[1]; }
+    else { const c = map.getCenter(); lat = c.lat; lng = c.lng; }
+  } else {
+    const c = map.getCenter();
+    lat = c.lat; lng = c.lng;
+  }
+
+  const la = fmt(lat), lo = fmt(lng);
+  const warnClass = warn ? ' warn' : '';
+  document.getElementById('latDigits').className = 'c-digits' + warnClass;
+  document.getElementById('latDigits').innerHTML = `<span class="int">${la.int}</span><span class="dot">.</span><span class="dec">${la.dec}</span>`;
+  document.getElementById('lngDigits').className = 'c-digits' + warnClass;
+  document.getElementById('lngDigits').innerHTML = `<span class="int">${lo.int}</span><span class="dot">.</span><span class="dec">${lo.dec}</span>`;
+}
+
+map.on('move', () => { if (source === 'center') updateDisplay(); });
+
+// ═══════════════════════════════════════════
+// TAP ON MAP
+// ═══════════════════════════════════════════
+map.on('click', function(e) {
+  tapPos = [e.latlng.lat, e.latlng.lng];
+  
+  // Visual tap marker
+  if (tapMarker) map.removeLayer(tapMarker);
+  tapMarker = L.circleMarker(e.latlng, {
+    radius: 12, color: '#8b7cf8', fillColor: '#8b7cf8', fillOpacity: 0.25, weight: 2.5
+  }).addTo(map);
+
+  // Auto-switch to tap mode
+  setSource('tap');
+  
+  // Toast with coords
+  const la = fmt(tapPos[0]), lo = fmt(tapPos[1]);
+  toast(`${la.int}.${la.dec}  ${lo.int}.${lo.dec}`);
+
+  // Remove tap marker after 30s
+  setTimeout(() => { if (tapMarker) { map.removeLayer(tapMarker); tapMarker = null; } }, 30000);
+});
+
+// ═══════════════════════════════════════════
+// SOURCE MODE
+// ═══════════════════════════════════════════
+function setSource(mode) {
+  source = mode;
+  document.querySelectorAll('.source-pill').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  if (mode === 'gps' && !gpsOn) toggleGPS();
+  updateDisplay();
+}
+
+// ═══════════════════════════════════════════
+// GPS
+// ═══════════════════════════════════════════
+function toggleGPS() {
+  const badge = document.getElementById('gpsBadge');
+  const dot = document.getElementById('gpsDot');
+  const txt = document.getElementById('gpsText');
+
+  if (gpsOn) {
+    if (gpsWatchId !== null) navigator.geolocation.clearWatch(gpsWatchId);
+    gpsOn = false; gpsWatchId = null; gpsPos = null; gpsAcc = null;
+    badge.className = 'gps-badge';
+    dot.className = 'gps-dot off';
+    txt.textContent = 'GPS av';
+    document.getElementById('accTag').style.display = 'none';
+    if (gpsMarker) { map.removeLayer(gpsMarker); gpsMarker = null; }
+    if (gpsCircle) { map.removeLayer(gpsCircle); gpsCircle = null; }
+    if (source === 'gps') setSource('center');
+    return;
+  }
+
+  if (!navigator.geolocation) { toast('Ingen GPS'); return; }
+  gpsOn = true;
+  badge.className = 'gps-badge tracking searching';
+  dot.className = 'gps-dot ok';
+  txt.textContent = 'Söker...';
+
+  gpsWatchId = navigator.geolocation.watchPosition(pos => {
+    gpsPos = [pos.coords.latitude, pos.coords.longitude];
+    gpsAcc = pos.coords.accuracy;
+
+    // Marker
+    if (gpsMarker) map.removeLayer(gpsMarker);
+    gpsMarker = L.circleMarker(gpsPos, {
+      radius: 7, color: '#fff', fillColor: '#2ee8c8', fillOpacity: 1, weight: 2.5
+    }).addTo(map);
+
+    // Accuracy circle
+    if (gpsCircle) map.removeLayer(gpsCircle);
+    gpsCircle = L.circle(gpsPos, {
+      radius: gpsAcc, color: 'rgba(46,232,200,.35)', fillColor: 'rgba(46,232,200,.08)',
+      fillOpacity: 1, weight: 1, dashArray: '4,4'
+    }).addTo(map);
+
+    // Badge
+    badge.className = 'gps-badge tracking';
+    const q = gpsAcc < 10 ? 'good' : gpsAcc < 30 ? 'ok' : 'poor';
+    dot.className = 'gps-dot ' + q;
+    txt.textContent = `±${Math.round(gpsAcc)}m`;
+
+    // Accuracy tag
+    const tag = document.getElementById('accTag');
+    tag.style.display = '';
+    tag.className = 'acc-tag ' + q;
+    document.getElementById('accVal').textContent = Math.round(gpsAcc);
+
+    if (source === 'gps') updateDisplay();
+  }, err => {
+    toast('GPS-fel');
+    toggleGPS();
+  }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 3000 });
+}
+
+function centerOnGPS() {
+  if (gpsPos) {
+    map.setView(gpsPos, Math.max(map.getZoom(), 17));
+  } else {
+    if (!gpsOn) toggleGPS();
+    toast('Söker GPS...');
+  }
+}
+
+// ═══════════════════════════════════════════
+// COPY
+// ═══════════════════════════════════════════
+function getCurrentCoords() {
+  if (source === 'gps' && gpsPos) return gpsPos;
+  if (source === 'tap' && tapPos) return tapPos;
+  const c = map.getCenter();
+  return [c.lat, c.lng];
+}
+
+function copyPair() {
+  const [lat, lng] = getCurrentCoords();
+  const text = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  doCopy(text);
+  toast(text);
+}
+
+function copyForNotebook() {
+  const [lat, lng] = getCurrentCoords();
+  const text = `N ${lat.toFixed(5)}  E ${lng.toFixed(5)}`;
+  doCopy(text);
+  toast(text);
+}
+
+function doCopy(text) {
+  navigator.clipboard.writeText(text).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+  });
+}
+
+// ═══════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._tm);
+  t._tm = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// Init
+updateDisplay();
+</script>
+</body>
+</html>

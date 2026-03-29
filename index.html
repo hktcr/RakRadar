@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>RåkRadar — Fältinventering av råkbon</title>
+<meta name="description" content="Fältverktyg för inventering av råkbon i Åstorps kommun">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--bg:#0c0e14;--surface:#151821;--surface2:#1c2030;--surface3:#252a3a;
+--border:#2a3045;--border-light:#1e2338;
+--text:#c8cdd8;--text-bright:#edf0f7;--text-muted:#5b6478;
+--accent:#7c6ef0;--accent-light:#a59af8;--accent-glow:rgba(124,110,240,.12);--accent-solid:rgba(124,110,240,.25);
+--green:#34d399;--green-dim:#22c55e;--green-glow:rgba(52,211,153,.12);
+--red:#f87171;--orange:#fbbf24;--cyan:#22d3ee;
+--radius:10px;
+--font:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+--shadow:0 4px 24px rgba(0,0,0,.5);
+}
+html,body{height:100%;overflow:hidden;touch-action:manipulation}
+body{font-family:var(--font);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;display:flex;flex-direction:column}
+
+/* HEADER */
+.header{display:flex;align-items:center;gap:8px;padding:8px 14px;background:linear-gradient(180deg,var(--surface) 0%,var(--surface2) 100%);border-bottom:1px solid var(--border);flex-shrink:0;z-index:1000}
+.logo{font-size:.88rem;font-weight:800;background:linear-gradient(135deg,var(--accent-light),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-.03em;white-space:nowrap}
+.logo-sub{font-weight:400;font-size:.65rem;color:var(--text-muted);margin-left:6px;-webkit-text-fill-color:var(--text-muted)}
+.header-spacer{flex:1}
+.hdr-btn{display:inline-flex;align-items:center;gap:4px;padding:7px 11px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);font-family:inherit;font-size:.72rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .2s;backdrop-filter:blur(8px)}
+.hdr-btn:hover,.hdr-btn:active{background:var(--surface3);border-color:var(--accent);color:var(--text-bright);transform:scale(1.02)}
+.hdr-btn.accent{border-color:var(--accent);color:var(--accent-light);background:var(--accent-glow)}
+.hdr-btn.accent:hover{background:var(--accent-solid)}
+
+/* MAP */
+.map-wrap{flex:1;position:relative}
+#map{width:100%;height:100%;z-index:1}
+.leaflet-control-container .leaflet-top.leaflet-right{top:44px}
+
+/* LAYER TOGGLE */
+.layer-toggle{position:absolute;top:8px;right:8px;z-index:1000;display:flex;border-radius:10px;overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow);backdrop-filter:blur(12px)}
+.layer-btn{padding:8px 13px;border:none;background:rgba(21,24,33,.85);color:var(--text-muted);font-family:inherit;font-size:.68rem;font-weight:600;cursor:pointer;transition:all .2s;border-right:1px solid var(--border)}
+.layer-btn:last-child{border-right:none}
+.layer-btn.active{background:var(--accent);color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.3)}
+.layer-btn:hover:not(.active){background:var(--surface3);color:var(--text)}
+
+/* VIZ TOGGLE */
+.viz-toggle{position:absolute;bottom:72px;left:8px;z-index:1000;display:flex;flex-direction:column;gap:3px}
+.viz-btn{padding:7px 10px;border:1px solid var(--border);border-radius:10px;background:rgba(21,24,33,.9);color:var(--text-muted);font-family:inherit;font-size:.65rem;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap;backdrop-filter:blur(8px)}
+.viz-btn.active{background:var(--green-dim);color:#fff;border-color:var(--green-dim);box-shadow:0 0 12px rgba(34,197,94,.3)}
+.viz-btn:hover:not(.active){background:var(--surface3);color:var(--text)}
+
+/* INFO BADGE */
+.info-badge{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:1000;background:rgba(21,24,33,.92);border:1px solid var(--border);border-radius:20px;padding:6px 16px;font-size:.72rem;color:var(--text);box-shadow:var(--shadow);pointer-events:none;display:flex;gap:10px;align-items:center;backdrop-filter:blur(12px)}
+.info-badge .stat{display:flex;align-items:center;gap:4px}
+.info-badge .stat-val{font-weight:800;font-size:.8rem}
+.info-badge .stat-val.purple{color:var(--accent-light)}
+.info-badge .stat-val.green{color:var(--green)}
+.info-badge .stat-val.cyan{color:var(--cyan)}
+.info-badge .stat-lbl{font-size:.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em}
+
+/* BOTTOM BAR */
+.bottom-bar{display:flex;align-items:center;gap:6px;padding:8px 12px;background:linear-gradient(0deg,var(--surface) 0%,var(--surface2) 100%);border-top:1px solid var(--border);flex-shrink:0;z-index:1000}
+.bb-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:11px 8px;border:1px solid var(--border);border-radius:12px;background:var(--surface2);color:var(--text);font-family:inherit;font-size:.72rem;font-weight:700;cursor:pointer;transition:all .2s}
+.bb-btn:active{transform:scale(.95)}
+.bb-btn.primary{background:linear-gradient(135deg,var(--accent),#5b4dd4);border-color:var(--accent);color:#fff;box-shadow:0 2px 12px rgba(124,110,240,.3)}
+.bb-btn.add-active{background:linear-gradient(135deg,var(--green-dim),#15803d)!important;border-color:var(--green-dim)!important;color:#fff!important;box-shadow:0 2px 12px rgba(34,197,94,.3)!important}
+
+/* FILTER DRAWER */
+.filter-drawer{position:absolute;bottom:0;left:0;right:0;z-index:1500;background:var(--surface);border-top:1px solid var(--border);border-radius:16px 16px 0 0;padding:0;max-height:0;overflow:hidden;transition:max-height .3s ease,padding .3s ease;box-shadow:0 -8px 32px rgba(0,0,0,.5)}
+.filter-drawer.open{max-height:60vh;padding:16px}
+.filter-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 12px}
+.filter-title{font-size:.78rem;font-weight:700;color:var(--text-bright);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.filter-title .close-filter{margin-left:auto;background:none;border:none;color:var(--text-muted);font-size:1rem;cursor:pointer;padding:4px}
+.filter-actions{display:flex;gap:6px;margin-bottom:12px}
+.filter-actions button{padding:5px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text-muted);font-family:inherit;font-size:.68rem;font-weight:600;cursor:pointer;transition:all .15s}
+.filter-actions button:hover{background:var(--surface3);color:var(--text)}
+.filter-sessions{max-height:35vh;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+.filter-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all .15s;user-select:none}
+.filter-item:hover{background:var(--surface2)}
+.filter-item.checked{background:var(--accent-glow);border-color:var(--accent)}
+.filter-item input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+.filter-item .fi-date{font-weight:700;color:var(--text-bright);font-size:.82rem}
+.filter-item .fi-meta{font-size:.65rem;color:var(--text-muted)}
+.filter-item .fi-color{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.filter-item .fi-badge{margin-left:auto;background:var(--surface3);color:var(--text);padding:2px 8px;border-radius:8px;font-size:.68rem;font-weight:700}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:2000;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px)}
+.modal-overlay.visible{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:20px 20px 0 0;padding:22px;width:100%;max-width:440px;max-height:85vh;overflow-y:auto;animation:slideUp .25s ease;box-shadow:0 -8px 48px rgba(0,0,0,.5)}
+@keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal.center{border-radius:20px;align-self:center;max-height:90vh}
+.modal h3{font-size:.95rem;font-weight:800;color:var(--text-bright);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.modal-close{margin-left:auto;background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);font-size:.85rem;cursor:pointer;padding:6px 10px;border-radius:8px;transition:all .15s}
+.modal-close:hover{background:var(--surface3);color:var(--text-bright)}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:.68rem;font-weight:700;color:var(--text-muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em}
+.form-group input,.form-group textarea,.form-group select{width:100%;padding:11px 14px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text-bright);font-family:inherit;font-size:.85rem;outline:none;transition:border-color .2s,box-shadow .2s}
+.form-group input:focus,.form-group textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+.form-group textarea{resize:vertical;min-height:60px}
+.form-group input[type="number"]{font-size:1.6rem;font-weight:800;text-align:center;padding:16px;letter-spacing:.05em}
+.modal-actions{display:flex;gap:8px;margin-top:18px}
+.modal-actions button{flex:1;padding:13px;border-radius:12px;font-family:inherit;font-size:.82rem;font-weight:700;cursor:pointer;transition:all .2s;border:none}
+.btn-cancel{background:var(--surface2);color:var(--text-muted);border:1px solid var(--border)!important}
+.btn-save{background:linear-gradient(135deg,var(--accent),#5b4dd4);color:#fff;box-shadow:0 2px 12px rgba(124,110,240,.25)}
+.btn-delete{background:linear-gradient(135deg,var(--red),#dc2626);color:#fff}
+.btn-save:active,.btn-delete:active{transform:scale(.97)}
+
+/* SESSION LIST */
+.session-list{list-style:none;max-height:300px;overflow-y:auto}
+.session-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer;transition:all .2s}
+.session-item:hover{background:var(--surface2);border-color:var(--text-muted)}
+.session-item.active{background:var(--accent-glow);border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.session-item .s-color{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.session-item .date{font-weight:700;color:var(--text-bright);font-size:.85rem}
+.session-item .meta{font-size:.68rem;color:var(--text-muted)}
+.session-item .badge{margin-left:auto;background:var(--accent-glow);color:var(--accent-light);padding:3px 10px;border-radius:10px;font-size:.7rem;font-weight:700}
+.session-item .del-btn{margin-left:4px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.85rem;padding:4px;transition:color .15s}
+.session-item .del-btn:hover{color:var(--red)}
+
+/* EXPORT BOX */
+.export-box{width:100%;min-height:120px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-family:'SF Mono','Fira Code',monospace;font-size:.68rem;line-height:1.5;white-space:pre;overflow-x:auto;margin-bottom:12px}
+.export-tabs{display:flex;gap:4px;margin-bottom:12px}
+.export-tab{padding:7px 14px;border:1px solid var(--border);border-radius:10px;background:transparent;color:var(--text-muted);font-family:inherit;font-size:.7rem;font-weight:700;cursor:pointer;transition:all .15s}
+.export-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* GRID LEGEND */
+.grid-legend{position:absolute;bottom:72px;right:8px;z-index:1000;background:rgba(21,24,33,.92);border:1px solid var(--border);border-radius:12px;padding:10px 12px;display:none;min-width:100px;backdrop-filter:blur(12px);box-shadow:var(--shadow)}
+.grid-legend.visible{display:block}
+.grid-legend h4{font-size:.6rem;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:.65rem;color:var(--text);margin-bottom:3px}
+.legend-color{width:18px;height:12px;border-radius:3px;border:1px solid rgba(255,255,255,.08)}
+
+/* SUMMARY PANEL */
+.summary-panel{position:absolute;top:44px;right:8px;z-index:1000;background:rgba(21,24,33,.95);border:1px solid var(--border);border-radius:14px;padding:14px 16px;min-width:180px;backdrop-filter:blur(12px);box-shadow:var(--shadow);display:none}
+.summary-panel.visible{display:block}
+.summary-panel h4{font-size:.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:10px}
+.summary-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border-light)}
+.summary-row:last-child{border-bottom:none}
+.summary-row .sr-label{font-size:.72rem;color:var(--text)}
+.summary-row .sr-value{font-size:.82rem;font-weight:800;color:var(--text-bright)}
+.summary-row .sr-value.highlight{color:var(--accent-light)}
+
+/* TOAST */
+.toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);z-index:3000;background:linear-gradient(135deg,var(--accent),#5b4dd4);color:#fff;padding:9px 20px;border-radius:20px;font-size:.78rem;font-weight:700;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;box-shadow:0 4px 16px rgba(124,110,240,.4);transform:translateX(-50%) translateY(10px)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* LOCATE */
+.map-ctrl-stack{position:absolute;bottom:72px;right:8px;z-index:999;display:flex;flex-direction:column;gap:4px}
+.ctrl-btn{width:40px;height:40px;border-radius:12px;background:rgba(21,24,33,.9);border:1px solid var(--border);color:var(--text);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1rem;box-shadow:var(--shadow);backdrop-filter:blur(8px);transition:all .2s}
+.ctrl-btn:active{background:var(--surface3);transform:scale(.95)}
+
+/* MARKER PULSE */
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(124,110,240,.5)}70%{box-shadow:0 0 0 8px rgba(124,110,240,0)}100%{box-shadow:0 0 0 0 rgba(124,110,240,0)}}
+
+@media(min-width:600px){
+.modal{border-radius:20px;align-self:center;margin-bottom:0}
+.filter-drawer{border-radius:16px;position:absolute;bottom:0;max-width:320px;left:8px;right:auto}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">🐦‍⬛ RåkRadar <span class="logo-sub">Åstorp</span></div>
+  <div class="header-spacer"></div>
+  <button class="hdr-btn" onclick="openSessionModal()" id="sessionHdrBtn">📅 <span id="sessionLabel">Idag</span></button>
+  <button class="hdr-btn" onclick="toggleFilter()" id="filterBtn">🔽 Filter</button>
+  <button class="hdr-btn" onclick="toggleSummary()" title="Summering">📊</button>
+  <button class="hdr-btn" onclick="openExportModal()" title="Exportera">📤</button>
+</div>
+
+<div class="map-wrap">
+  <div id="map"></div>
+  <div class="layer-toggle">
+    <button class="layer-btn active" data-layer="street">Karta</button>
+    <button class="layer-btn" data-layer="terrain">Terräng</button>
+    <button class="layer-btn" data-layer="satellite">Satellit</button>
+  </div>
+  <div class="info-badge" id="infoBadge">
+    <div class="stat"><span class="stat-val purple" id="pointCount">0</span><span class="stat-lbl">Punkter</span></div>
+    <div class="stat"><span class="stat-val green" id="nestCount">0</span><span class="stat-lbl">Bon</span></div>
+    <div class="stat"><span class="stat-val cyan" id="dayCount">0</span><span class="stat-lbl">Dagar</span></div>
+  </div>
+  <div class="viz-toggle">
+    <button class="viz-btn active" data-viz="points" onclick="setViz('points')">● Punkter</button>
+    <button class="viz-btn" data-viz="grid100" onclick="setViz('grid100')">▦ 100m</button>
+    <button class="viz-btn" data-viz="grid250" onclick="setViz('grid250')">▦ 250m</button>
+    <button class="viz-btn" data-viz="grid500" onclick="setViz('grid500')">▦ 500m</button>
+  </div>
+  <div class="grid-legend" id="gridLegend">
+    <h4>Bon / ruta</h4>
+    <div class="legend-item"><div class="legend-color" style="background:#34d399"></div>1–5</div>
+    <div class="legend-item"><div class="legend-color" style="background:#fbbf24"></div>6–15</div>
+    <div class="legend-item"><div class="legend-color" style="background:#f87171"></div>16–30</div>
+    <div class="legend-item"><div class="legend-color" style="background:#ef4444"></div>31+</div>
+  </div>
+  <div class="summary-panel" id="summaryPanel">
+    <h4>📊 Summering</h4>
+    <div id="summaryContent"></div>
+  </div>
+  <div class="map-ctrl-stack">
+    <button class="ctrl-btn" onclick="locateMe()" title="Min position">📍</button>
+    <button class="ctrl-btn" onclick="fitBounds()" title="Visa allt">🔲</button>
+  </div>
+
+  <!-- FILTER DRAWER -->
+  <div class="filter-drawer" id="filterDrawer">
+    <div class="filter-handle"></div>
+    <div class="filter-title">🔽 Visa fältdagar <button class="close-filter" onclick="toggleFilter()">✕</button></div>
+    <div class="filter-actions">
+      <button onclick="filterAll()">✅ Alla</button>
+      <button onclick="filterNone()">☐ Ingen</button>
+      <button onclick="filterActiveOnly()">📌 Bara aktiv</button>
+    </div>
+    <div class="filter-sessions" id="filterList"></div>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <button class="bb-btn" onclick="openSessionModal()">📅 Fältdagar</button>
+  <button class="bb-btn primary" id="addModeBtn" onclick="toggleAddMode()">📍 Placera bon</button>
+  <button class="bb-btn" onclick="openExportModal()">📤 Export</button>
+</div>
+
+<!-- OBSERVATION MODAL -->
+<div class="modal-overlay" id="obsModal">
+  <div class="modal">
+    <h3>🪹 Registrera bon <button class="modal-close" onclick="closeModal('obsModal')">✕</button></h3>
+    <div class="form-group">
+      <label>Antal bon</label>
+      <input type="number" id="obsNestCount" min="1" value="1" inputmode="numeric">
+    </div>
+    <div class="form-group">
+      <label>Kommentar (valfri)</label>
+      <textarea id="obsComment" placeholder="T.ex. alm vid kyrkan, hög krona..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Koordinater</label>
+      <input type="text" id="obsCoords" readonly style="font-size:.72rem;color:var(--text-muted)">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('obsModal')">Avbryt</button>
+      <button class="btn-delete" id="obsDeleteBtn" onclick="deleteObs()" style="display:none">Radera</button>
+      <button class="btn-save" onclick="saveObs()">Spara</button>
+    </div>
+  </div>
+</div>
+
+<!-- SESSION MODAL -->
+<div class="modal-overlay" id="sessionModal">
+  <div class="modal center">
+    <h3>📅 Fältdagar <button class="modal-close" onclick="closeModal('sessionModal')">✕</button></h3>
+    <div class="form-group">
+      <label>Ny fältdag</label>
+      <div style="display:flex;gap:6px">
+        <input type="date" id="newSessionDate" style="flex:1">
+        <button class="btn-save" style="flex:0;padding:11px 18px" onclick="createSession()">Skapa</button>
+      </div>
+    </div>
+    <label style="font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:8px">Befintliga fältdagar</label>
+    <ul class="session-list" id="sessionList"></ul>
+    <div class="modal-actions" style="margin-top:12px">
+      <button class="btn-cancel" onclick="closeModal('sessionModal')">Stäng</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXPORT MODAL -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal center">
+    <h3>📤 Exportera data <button class="modal-close" onclick="closeModal('exportModal')">✕</button></h3>
+    <div class="export-tabs">
+      <button class="export-tab active" onclick="setExportTab('artportalen')">Artportalen TSV</button>
+      <button class="export-tab" onclick="setExportTab('json')">JSON Backup</button>
+    </div>
+    <div class="form-group">
+      <label>Fältdag</label>
+      <select id="exportSession" onchange="generateExport()">
+        <option value="all">Alla fältdagar</option>
+      </select>
+    </div>
+    <div class="export-box" id="exportBox">Välj fältdag och format...</div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('exportModal')">Stäng</button>
+      <button class="btn-save" onclick="copyExport()">📋 Kopiera</button>
+      <button class="btn-save" style="background:linear-gradient(135deg,var(--green-dim),#15803d)" onclick="downloadExport()">💾 Ladda ner</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// CONSTANTS
+// ============================================================
+const ASTORP_BOUNDARY = [[56.13336644158679,13.09441598120654],[56.15308134241665,13.075426714220935],[56.17227333280345,13.032405825964709],[56.18736209251589,13.012547832342756],[56.17845145239766,12.962804726179286],[56.14068640518647,12.93141814074781],[56.142083676945624,12.882351723648581],[56.1285446372481,12.83897736487567],[56.10176743719125,12.843392488066545],[56.09420405115015,12.87400081280073],[56.10329578233101,12.90006008332717],[56.11858865850942,12.916726533463356],[56.12198333824545,12.949140310134169],[56.11432198596138,12.968652122032942],[56.11315902004711,13.00448105391143],[56.10291453341187,13.014252594068308],[56.074504983181995,13.070141363477672],[56.08844082018057,13.097852809692492],[56.10370522349981,13.086032150550484],[56.12462157429597,13.105164607118635],[56.13321171954772,13.094642944325177],[56.13336644158679,13.09441598120654]];
+const ASTORP_CENTER = [56.1309, 12.9917];
+const SESSION_COLORS = ['#7c6ef0','#34d399','#fbbf24','#f87171','#22d3ee','#fb923c','#a78bfa','#f472b6','#4ade80','#38bdf8','#e879f9','#facc15'];
+const STORAGE_KEY = 'rakradar_data';
+
+// ============================================================
+// STATE
+// ============================================================
+let state = loadState();
+let currentViz = 'points';
+let addMode = false;
+let editingObsId = null;
+let pendingLatLng = null;
+let exportFormat = 'artportalen';
+let gridLayer = null;
+let markersLayer = null;
+
+function defaultState() {
+  return { sessions: [], settings: { defaultSurveyor: 'Håkan Karlsson', activeSession: null, visibleSessions: [] } };
+}
+function loadState() {
+  try { const d = localStorage.getItem(STORAGE_KEY); const s = d ? JSON.parse(d) : defaultState(); if (!s.settings.visibleSessions) s.settings.visibleSessions = s.sessions.map(x=>x.id); return s; }
+  catch(e) { return defaultState(); }
+}
+function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); updateUI(); }
+function getSession(id) { return state.sessions.find(s => s.id === id); }
+function activeSession() { return getSession(state.settings.activeSession); }
+function sessionColor(idx) { return SESSION_COLORS[idx % SESSION_COLORS.length]; }
+function isVisible(id) { return state.settings.visibleSessions.includes(id); }
+
+// ============================================================
+// MAP INIT
+// ============================================================
+const map = L.map('map', { zoomControl: false, attributionControl: false }).setView(ASTORP_CENTER, 13);
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+const tiles = {
+  street: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19 }),
+  terrain: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17 }),
+  satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 })
+};
+tiles.street.addTo(map);
+
+document.querySelectorAll('.layer-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.layer-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    Object.values(tiles).forEach(t => map.removeLayer(t));
+    tiles[this.dataset.layer].addTo(map);
+  });
+});
+
+L.polygon(ASTORP_BOUNDARY, { color: '#7c6ef0', weight: 2, fillColor: '#7c6ef0', fillOpacity: 0.03, dashArray: '8,4' }).addTo(map);
+markersLayer = L.layerGroup().addTo(map);
+
+// Map click → add observation
+map.on('click', function(e) {
+  if (!addMode) return;
+  const s = activeSession();
+  if (!s) { toast('Välj eller skapa en fältdag först!'); return; }
+  pendingLatLng = e.latlng;
+  editingObsId = null;
+  document.getElementById('obsNestCount').value = 1;
+  document.getElementById('obsComment').value = '';
+  document.getElementById('obsCoords').value = `${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
+  document.getElementById('obsDeleteBtn').style.display = 'none';
+  openModal('obsModal');
+  setTimeout(() => { const inp = document.getElementById('obsNestCount'); inp.focus(); inp.select(); }, 200);
+});
+
+// ============================================================
+// VISIBLE DATA HELPERS
+// ============================================================
+function getVisibleObs() {
+  const obs = [];
+  state.sessions.forEach((s, idx) => {
+    if (!isVisible(s.id)) return;
+    s.observations.forEach(o => obs.push({ ...o, sessionId: s.id, date: s.date, color: sessionColor(idx) }));
+  });
+  return obs;
+}
+
+// ============================================================
+// MARKERS
+// ============================================================
+function renderMarkers() {
+  markersLayer.clearLayers();
+  if (gridLayer) { map.removeLayer(gridLayer); gridLayer = null; }
+  if (currentViz !== 'points') { renderGrid(); return; }
+  document.getElementById('gridLegend').classList.remove('visible');
+
+  const allObs = getVisibleObs();
+  allObs.forEach(obs => {
+    const size = Math.min(16 + obs.nestCount * 2.5, 48);
+    const isActive = obs.sessionId === state.settings.activeSession;
+    const borderW = isActive ? 3 : 2;
+    const shadow = isActive ? `animation:pulse 2s infinite;` : '';
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${obs.color};border:${borderW}px solid rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:${Math.max(10, size/2.8)}px;font-weight:800;font-family:Inter,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.5);cursor:pointer;${shadow}">${obs.nestCount}</div>`,
+      iconSize: [size, size], iconAnchor: [size/2, size/2]
+    });
+    const canDrag = obs.sessionId === state.settings.activeSession;
+    const marker = L.marker([obs.lat, obs.lng], { icon, draggable: canDrag })
+      .on('click', () => { if (obs.sessionId === state.settings.activeSession) editObs(obs.id); else toast(`${obs.date}: ${obs.nestCount} bon`); })
+      .on('dragend', function(e) {
+        const s = getSession(obs.sessionId);
+        const o = s?.observations.find(x => x.id === obs.id);
+        if (o) { o.lat = e.target.getLatLng().lat; o.lng = e.target.getLatLng().lng; saveState(); toast('Punkt flyttad'); }
+      });
+    const label = obs.comment ? `${obs.date}: ${obs.comment} (${obs.nestCount} bon)` : `${obs.date}: ${obs.nestCount} bon`;
+    marker.bindTooltip(label, { direction: 'top', offset: [0, -size/2] });
+    markersLayer.addLayer(marker);
+  });
+}
+
+// ============================================================
+// GRID VISUALIZATION
+// ============================================================
+function renderGrid() {
+  if (gridLayer) { map.removeLayer(gridLayer); gridLayer = null; }
+  document.getElementById('gridLegend').classList.add('visible');
+
+  const gridSize = currentViz === 'grid100' ? 100 : currentViz === 'grid250' ? 250 : 500;
+  const allObs = getVisibleObs();
+  if (allObs.length === 0) return;
+
+  const cells = {};
+  allObs.forEach(obs => {
+    const cellX = Math.floor(lngToMeters(obs.lng, obs.lat) / gridSize);
+    const cellY = Math.floor(latToMeters(obs.lat) / gridSize);
+    const key = `${cellX}_${cellY}`;
+    if (!cells[key]) cells[key] = { x: cellX, y: cellY, count: 0 };
+    cells[key].count += obs.nestCount;
+  });
+
+  gridLayer = L.layerGroup();
+  Object.values(cells).forEach(cell => {
+    const lat1 = metersToLat(cell.y * gridSize);
+    const lat2 = metersToLat((cell.y + 1) * gridSize);
+    const lng1 = metersToLng(cell.x * gridSize, (lat1 + lat2) / 2);
+    const lng2 = metersToLng((cell.x + 1) * gridSize, (lat1 + lat2) / 2);
+    const color = cell.count <= 5 ? '#34d399' : cell.count <= 15 ? '#fbbf24' : cell.count <= 30 ? '#f87171' : '#ef4444';
+    const opacity = Math.min(0.25 + cell.count * 0.015, 0.65);
+    const rect = L.rectangle([[lat1, lng1], [lat2, lng2]], { color, weight: 1, fillColor: color, fillOpacity: opacity });
+    rect.bindTooltip(`<b>${cell.count}</b> bon`, { sticky: true, className: '' });
+    gridLayer.addLayer(rect);
+    // Label
+    const center = [(lat1+lat2)/2, (lng1+lng2)/2];
+    const label = L.divIcon({ className: '', html: `<div style="color:#fff;font-size:${gridSize>200?12:10}px;font-weight:800;text-shadow:0 1px 3px rgba(0,0,0,.8);text-align:center;pointer-events:none">${cell.count}</div>`, iconSize:[40,20], iconAnchor:[20,10] });
+    L.marker(center, { icon: label, interactive: false }).addTo(gridLayer);
+  });
+  gridLayer.addTo(map);
+}
+
+function latToMeters(lat) { return lat * 111320; }
+function metersToLat(m) { return m / 111320; }
+function lngToMeters(lng, lat) { return lng * 111320 * Math.cos(lat * Math.PI / 180); }
+function metersToLng(m, lat) { return m / (111320 * Math.cos(lat * Math.PI / 180)); }
+
+// ============================================================
+// OBSERVATIONS CRUD
+// ============================================================
+function saveObs() {
+  const s = activeSession();
+  if (!s) return;
+  const count = parseInt(document.getElementById('obsNestCount').value) || 1;
+  const comment = document.getElementById('obsComment').value.trim();
+  if (editingObsId) {
+    const obs = s.observations.find(o => o.id === editingObsId);
+    if (obs) { obs.nestCount = count; obs.comment = comment; }
+    toast('Observation uppdaterad');
+  } else if (pendingLatLng) {
+    s.observations.push({ id: 'obs-' + Date.now(), lat: pendingLatLng.lat, lng: pendingLatLng.lng, nestCount: count, comment, timestamp: new Date().toISOString() });
+    toast(`${count} bon registrerade`);
+  }
+  pendingLatLng = null; editingObsId = null;
+  closeModal('obsModal'); saveState();
+}
+
+function editObs(id) {
+  const s = activeSession(); if (!s) return;
+  const obs = s.observations.find(o => o.id === id); if (!obs) return;
+  editingObsId = id; pendingLatLng = null;
+  document.getElementById('obsNestCount').value = obs.nestCount;
+  document.getElementById('obsComment').value = obs.comment || '';
+  document.getElementById('obsCoords').value = `${obs.lat.toFixed(5)}, ${obs.lng.toFixed(5)}`;
+  document.getElementById('obsDeleteBtn').style.display = '';
+  openModal('obsModal');
+}
+
+function deleteObs() {
+  const s = activeSession(); if (!s || !editingObsId) return;
+  s.observations = s.observations.filter(o => o.id !== editingObsId);
+  editingObsId = null; closeModal('obsModal'); saveState(); toast('Observation raderad');
+}
+
+// ============================================================
+// SESSIONS
+// ============================================================
+function createSession() {
+  const date = document.getElementById('newSessionDate').value;
+  if (!date) { toast('Välj ett datum!'); return; }
+  if (state.sessions.find(s => s.date === date)) { toast('Fältdag finns redan!'); return; }
+  const session = { id: 'session-' + date, date, surveyor: state.settings.defaultSurveyor, notes: '', observations: [] };
+  state.sessions.push(session);
+  state.sessions.sort((a, b) => b.date.localeCompare(a.date));
+  state.settings.activeSession = session.id;
+  if (!state.settings.visibleSessions.includes(session.id)) state.settings.visibleSessions.push(session.id);
+  saveState(); closeModal('sessionModal'); toast('Fältdag skapad: ' + date);
+}
+
+function selectSession(id) { state.settings.activeSession = id; saveState(); closeModal('sessionModal'); }
+
+function deleteSession(id, e) {
+  e.stopPropagation();
+  if (!confirm('Radera denna fältdag och alla dess observationer?')) return;
+  state.sessions = state.sessions.filter(s => s.id !== id);
+  state.settings.visibleSessions = state.settings.visibleSessions.filter(v => v !== id);
+  if (state.settings.activeSession === id) state.settings.activeSession = state.sessions[0]?.id || null;
+  saveState(); renderSessionList();
+}
+
+function renderSessionList() {
+  const list = document.getElementById('sessionList');
+  if (state.sessions.length === 0) { list.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;font-size:.8rem">Inga fältdagar ännu</div>'; return; }
+  list.innerHTML = state.sessions.map((s, idx) => {
+    const nObs = s.observations.length;
+    const nNests = s.observations.reduce((sum, o) => sum + o.nestCount, 0);
+    const active = s.id === state.settings.activeSession ? 'active' : '';
+    return `<li class="session-item ${active}" onclick="selectSession('${s.id}')">
+      <div class="s-color" style="background:${sessionColor(idx)}"></div>
+      <div><div class="date">${s.date}</div><div class="meta">${nObs} punkter · ${nNests} bon</div></div>
+      <span class="badge">${nNests}</span>
+      <button class="del-btn" onclick="deleteSession('${s.id}',event)" title="Radera">🗑</button>
+    </li>`;
+  }).join('');
+}
+
+function openSessionModal() {
+  document.getElementById('newSessionDate').value = new Date().toISOString().split('T')[0];
+  renderSessionList(); openModal('sessionModal');
+}
+
+// ============================================================
+// FILTER
+// ============================================================
+function toggleFilter() {
+  const d = document.getElementById('filterDrawer');
+  if (d.classList.contains('open')) { d.classList.remove('open'); return; }
+  renderFilterList(); d.classList.add('open');
+}
+
+function renderFilterList() {
+  const list = document.getElementById('filterList');
+  list.innerHTML = state.sessions.map((s, idx) => {
+    const n = s.observations.reduce((sum, o) => sum + o.nestCount, 0);
+    const checked = isVisible(s.id);
+    const isActive = s.id === state.settings.activeSession;
+    return `<label class="filter-item ${checked ? 'checked' : ''}">
+      <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleSessionVisibility('${s.id}', this.checked)">
+      <div class="fi-color" style="background:${sessionColor(idx)}"></div>
+      <div><div class="fi-date">${s.date}${isActive ? ' ✏️' : ''}</div><div class="fi-meta">${s.observations.length} punkter</div></div>
+      <span class="fi-badge">${n}</span>
+    </label>`;
+  }).join('');
+}
+
+function toggleSessionVisibility(id, visible) {
+  if (visible && !state.settings.visibleSessions.includes(id)) state.settings.visibleSessions.push(id);
+  else state.settings.visibleSessions = state.settings.visibleSessions.filter(v => v !== id);
+  saveState(); renderFilterList();
+}
+
+function filterAll() { state.settings.visibleSessions = state.sessions.map(s => s.id); saveState(); renderFilterList(); }
+function filterNone() { state.settings.visibleSessions = []; saveState(); renderFilterList(); }
+function filterActiveOnly() { state.settings.visibleSessions = state.settings.activeSession ? [state.settings.activeSession] : []; saveState(); renderFilterList(); }
+
+// ============================================================
+// SUMMARY
+// ============================================================
+function toggleSummary() {
+  const p = document.getElementById('summaryPanel');
+  p.classList.toggle('visible');
+  if (p.classList.contains('visible')) renderSummary();
+}
+
+function renderSummary() {
+  const allObs = getVisibleObs();
+  const totalNests = allObs.reduce((s, o) => s + o.nestCount, 0);
+  const totalPoints = allObs.length;
+  const days = [...new Set(allObs.map(o => o.date))].length;
+  const avgPerPoint = totalPoints > 0 ? (totalNests / totalPoints).toFixed(1) : '0';
+
+  // Find max cluster
+  let maxCluster = { count: 0, comment: '' };
+  allObs.forEach(o => { if (o.nestCount > maxCluster.count) maxCluster = { count: o.nestCount, comment: o.comment || 'Okänd plats' }; });
+
+  document.getElementById('summaryContent').innerHTML = `
+    <div class="summary-row"><span class="sr-label">Totalt bon</span><span class="sr-value highlight">${totalNests}</span></div>
+    <div class="summary-row"><span class="sr-label">Registreringspunkter</span><span class="sr-value">${totalPoints}</span></div>
+    <div class="summary-row"><span class="sr-label">Fältdagar (visade)</span><span class="sr-value">${days}</span></div>
+    <div class="summary-row"><span class="sr-label">Snitt bon/punkt</span><span class="sr-value">${avgPerPoint}</span></div>
+    <div class="summary-row"><span class="sr-label">Största koloni</span><span class="sr-value highlight">${maxCluster.count}</span></div>
+    ${maxCluster.comment ? `<div style="font-size:.65rem;color:var(--text-muted);margin-top:4px">${maxCluster.comment}</div>` : ''}
+  `;
+}
+
+// ============================================================
+// ADD MODE
+// ============================================================
+function toggleAddMode() {
+  addMode = !addMode;
+  const btn = document.getElementById('addModeBtn');
+  if (addMode) {
+    btn.className = 'bb-btn add-active';
+    btn.innerHTML = '✋ Avsluta placering';
+    map.getContainer().style.cursor = 'crosshair';
+    toast('Tryck på kartan för att placera bon');
+  } else {
+    btn.className = 'bb-btn primary';
+    btn.innerHTML = '📍 Placera bon';
+    map.getContainer().style.cursor = '';
+  }
+}
+
+// ============================================================
+// VISUALIZATION
+// ============================================================
+function setViz(mode) {
+  currentViz = mode;
+  document.querySelectorAll('.viz-btn').forEach(b => b.classList.toggle('active', b.dataset.viz === mode));
+  renderMarkers();
+}
+
+// ============================================================
+// EXPORT
+// ============================================================
+function openExportModal() {
+  const sel = document.getElementById('exportSession');
+  sel.innerHTML = '<option value="all">Alla fältdagar</option><option value="visible">Synliga fältdagar</option>';
+  state.sessions.forEach(s => {
+    const n = s.observations.reduce((sum, o) => sum + o.nestCount, 0);
+    sel.innerHTML += `<option value="${s.id}">${s.date} (${n} bon)</option>`;
+  });
+  if (state.settings.activeSession) sel.value = state.settings.activeSession;
+  generateExport(); openModal('exportModal');
+}
+
+function setExportTab(fmt) {
+  exportFormat = fmt;
+  document.querySelectorAll('.export-tab').forEach(b => b.classList.toggle('active', b.textContent.toLowerCase().includes(fmt === 'artportalen' ? 'artportalen' : 'json')));
+  generateExport();
+}
+
+function generateExport() {
+  const box = document.getElementById('exportBox');
+  const sessId = document.getElementById('exportSession').value;
+  let observations = [];
+  const sessions = sessId === 'all' ? state.sessions : sessId === 'visible' ? state.sessions.filter(s => isVisible(s.id)) : [getSession(sessId)].filter(Boolean);
+  sessions.forEach(s => { s.observations.forEach(o => observations.push({ ...o, date: s.date, surveyor: s.surveyor })); });
+
+  if (exportFormat === 'artportalen') {
+    const header = 'Artnamn\tAntal\tÅlder-Stadium\tKön\tAktivitet\tMetod\tLokalnamn\tOst\tNord\tNoggrannhet\tDiffusion\tDjup min\tDjup max\tHöjd min\tHöjd max\tStartdatum\tStarttid\tSlutdatum\tSluttid\tKommentar';
+    const rows = observations.map(o => {
+      const time = o.timestamp ? new Date(o.timestamp).toTimeString().slice(0,5) : '';
+      return `Råka\t${o.nestCount}\t\t\tBo\t\tÅstorp\t${o.lng.toFixed(5)}\t${o.lat.toFixed(5)}\t25\t\t\t\t\t\t${o.date}\t${time}\t\t\t${o.comment || ''}`;
+    });
+    box.textContent = [header, ...rows].join('\n');
+  } else {
+    box.textContent = JSON.stringify({ exported: new Date().toISOString(), sessions }, null, 2);
+  }
+}
+
+function copyExport() {
+  const text = document.getElementById('exportBox').textContent;
+  navigator.clipboard.writeText(text).then(() => toast('Kopierat till urklipp!')).catch(() => {
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta); toast('Kopierat!');
+  });
+}
+
+function downloadExport() {
+  const text = document.getElementById('exportBox').textContent;
+  const ext = exportFormat === 'artportalen' ? 'tsv' : 'json';
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `rakradar_export_${new Date().toISOString().split('T')[0]}.${ext}`;
+  a.click(); URL.revokeObjectURL(a.href); toast('Fil nedladdad');
+}
+
+function importBackup(jsonStr) {
+  try {
+    const data = JSON.parse(jsonStr);
+    if (data.sessions) {
+      data.sessions.forEach(imported => {
+        const existing = getSession(imported.id);
+        if (existing) { existing.observations = imported.observations; existing.notes = imported.notes; }
+        else { state.sessions.push(imported); }
+      });
+      state.sessions.sort((a, b) => b.date.localeCompare(a.date));
+      state.settings.visibleSessions = state.sessions.map(s => s.id);
+      saveState(); toast('Import klar!');
+    }
+  } catch(e) { toast('Felaktig JSON!'); }
+}
+
+// ============================================================
+// UI HELPERS
+// ============================================================
+function openModal(id) { document.getElementById(id).classList.add('visible'); }
+function closeModal(id) { document.getElementById(id).classList.remove('visible'); }
+function toast(msg) {
+  const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+function updateUI() {
+  const s = activeSession();
+  document.getElementById('sessionLabel').textContent = s ? s.date : 'Ingen dag';
+  const vis = getVisibleObs();
+  const totalNests = vis.reduce((sum, o) => sum + o.nestCount, 0);
+  const days = [...new Set(vis.map(o => o.date))].length;
+  document.getElementById('pointCount').textContent = vis.length;
+  document.getElementById('nestCount').textContent = totalNests;
+  document.getElementById('dayCount').textContent = days;
+  renderMarkers();
+  if (document.getElementById('summaryPanel').classList.contains('visible')) renderSummary();
+}
+
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('visible'); });
+});
+
+function fitBounds() {
+  const obs = getVisibleObs();
+  if (obs.length === 0) { map.fitBounds(L.polygon(ASTORP_BOUNDARY).getBounds()); return; }
+  const group = L.featureGroup(obs.map(o => L.marker([o.lat, o.lng])));
+  map.fitBounds(group.getBounds().pad(0.1));
+}
+
+// ============================================================
+// GEOLOCATION
+// ============================================================
+let locMarker = null;
+function locateMe() {
+  if (!navigator.geolocation) { toast('Geolocation stöds ej'); return; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    const ll = [pos.coords.latitude, pos.coords.longitude];
+    map.setView(ll, 17);
+    if (locMarker) map.removeLayer(locMarker);
+    locMarker = L.circleMarker(ll, { radius: 8, color: '#22d3ee', fillColor: '#22d3ee', fillOpacity: 0.7, weight: 2 }).addTo(map);
+    setTimeout(() => { if (locMarker) map.removeLayer(locMarker); locMarker = null; }, 10000);
+  }, () => toast('Kunde inte hämta position'), { enableHighAccuracy: true });
+}
+
+// ============================================================
+// STARTUP
+// ============================================================
+if (state.sessions.length === 0) {
+  const today = new Date().toISOString().split('T')[0];
+  state.sessions.push({ id: 'session-' + today, date: today, surveyor: 'Håkan Karlsson', notes: '', observations: [] });
+  state.settings.activeSession = 'session-' + today;
+  state.settings.visibleSessions = ['session-' + today];
+  saveState();
+}
+if (!state.settings.activeSession && state.sessions.length > 0) {
+  state.settings.activeSession = state.sessions[0].id;
+}
+// Ensure visibleSessions is populated
+if (!state.settings.visibleSessions || state.settings.visibleSessions.length === 0) {
+  state.settings.visibleSessions = state.sessions.map(s => s.id);
+}
+updateUI();
+</script>
+</body>
+</html>
